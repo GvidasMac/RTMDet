@@ -98,18 +98,36 @@ def qbox2hbox(boxes: Tensor) -> Tensor:
 def qbox2rbox(boxes: Tensor) -> Tensor:
     """Convert quadrilateral boxes to rotated boxes.
 
+    Labeling convention: pts[0] and pts[1] are the two corners of the
+    "top" edge (e.g. bottle cap end); pts[2] and pts[3] are the two
+    corners of the opposite "bottom" edge (e.g. bottle base end).
+    The resulting angle (in radians, range (-pi, pi]) points from the
+    center toward the cap end, preserving full 360-degree orientation.
+
     Args:
         boxes (Tensor): Quadrilateral box tensor with shape of (..., 8).
 
     Returns:
         Tensor: Rotated box tensor with shape of (..., 5).
     """
-    # TODO support tensor-based minAreaRect later
     original_shape = boxes.shape[:-1]
     points = boxes.cpu().numpy().reshape(-1, 4, 2)
     rboxes = []
     for pts in points:
-        (x, y), (w, h), angle = cv2.minAreaRect(pts)
-        rboxes.append([x, y, w, h, angle / 180 * np.pi])
+        cx, cy = pts.mean(axis=0)
+
+        cap_mid = (pts[0] + pts[1]) / 2   # midpoint of cap (top) edge
+        base_mid = (pts[2] + pts[3]) / 2  # midpoint of base (bottom) edge
+
+        # Full 360-degree angle pointing from center toward cap end
+        angle = np.arctan2(cap_mid[1] - cy, cap_mid[0] - cx)
+
+        # w = length along the bottle axis (cap to base)
+        w = float(np.linalg.norm(cap_mid - base_mid))
+        # h = width across the bottle (length of the cap/base edge)
+        h = float((np.linalg.norm(pts[1] - pts[0]) +
+                   np.linalg.norm(pts[3] - pts[2])) / 2)
+
+        rboxes.append([cx, cy, w, h, angle])
     rboxes = boxes.new_tensor(rboxes)
     return rboxes.view(*original_shape, 5)
