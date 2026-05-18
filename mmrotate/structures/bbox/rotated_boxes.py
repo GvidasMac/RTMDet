@@ -93,9 +93,15 @@ class RotatedBoxes(BaseBoxes):
                 width_longer, start_angle = True, -90
             elif pattern == 'le135':
                 width_longer, start_angle = True, -45
+            elif pattern == 'r360':
+                # Full 360° range: normalize angle to (-π, π], keep w/h as-is
+                x, y, w, h, t = boxes.unbind(dim=-1)
+                t = (t + np.pi) % (2 * np.pi) - np.pi
+                self.tensor = torch.stack([x, y, w, h, t], dim=-1)
+                return self.tensor
             else:
-                raise ValueError("pattern only can be 'oc', 'le90', and"
-                                 f"'le135', but get {pattern}.")
+                raise ValueError("pattern only can be 'oc', 'le90', 'le135', "
+                                 f"or 'r360', but get {pattern}.")
         start_angle = start_angle / 180 * np.pi
 
         x, y, w, h, t = boxes.unbind(dim=-1)
