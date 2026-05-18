@@ -163,16 +163,24 @@ class RotatedBoxes(BaseBoxes):
                 "vertical" and "diagonal". Defaults to "horizontal"
         """
         assert direction in ['horizontal', 'vertical', 'diagonal']
+        import math
         flipped = self.tensor
         if direction == 'horizontal':
             flipped[..., 0] = img_shape[1] - flipped[..., 0]
-            flipped[..., 4] = -flipped[..., 4]
+            # x-reflection: direction (dx,dy) → (-dx,dy), so angle → π - angle
+            flipped[..., 4] = math.pi - flipped[..., 4]
+            # normalise to (-π, π]
+            flipped[..., 4] = (flipped[..., 4] + math.pi) % (2 * math.pi) - math.pi
         elif direction == 'vertical':
             flipped[..., 1] = img_shape[0] - flipped[..., 1]
+            # y-reflection: direction (dx,dy) → (dx,-dy), so angle → -angle  ✓
             flipped[..., 4] = -flipped[..., 4]
         else:
             flipped[..., 0] = img_shape[1] - flipped[..., 0]
             flipped[..., 1] = img_shape[0] - flipped[..., 1]
+            # point-reflection: (dx,dy) → (-dx,-dy), so angle → angle + π
+            flipped[..., 4] = flipped[..., 4] + math.pi
+            flipped[..., 4] = (flipped[..., 4] + math.pi) % (2 * math.pi) - math.pi
 
     def translate_(self, distances: Tuple[float, float]) -> None:
         """Translate boxes in-place.
